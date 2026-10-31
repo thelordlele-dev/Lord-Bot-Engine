@@ -1,6 +1,15 @@
+> 🇺🇸 [Read this in English](README.en.md)
+
 # 🍫 TheLordTrufas Bot Engine: De n8n para Arquitetura Python Enterprise
 
 Um motor de atendimento automatizado, construído para escalar a operação de *delivery* da **TheLordTrufas**. Este projeto gere um fluxo complexo de vendas via WhatsApp, atuando como o cérebro central entre o cliente, o banco de dados de produtos (Notion) e a central de atendimento humano (Chatwoot).
+
+## 📸 Demonstração Visual (Painel ERP e Automação)
+
+![Painel de Controle e Banco de Dados no Notion](assets/notion-dashboard.gif)
+*Visão geral do ERP construído no Notion, gerenciando pedidos, estoque e taxas de pagamento em tempo real.*
+
+---
 
 ## 💡 Filosofia do Projeto
 
@@ -25,11 +34,17 @@ Iniciou-se como um ecossistema complexo no **n8n**, focado em validar a automaç
 * Sincronização em tempo real de carrinho e estoque usando o Notion como banco de dados NoSQL.
 * Implementação de suporte humano transparente usando a plataforma Chatwoot.
 
+![Demonstração da Arquitetura Visual no n8n](assets/n8n-fluxo.gif)
+*Mapeamento visual da Máquina de Estados Finita operando através dos nós do n8n.*
+
 ### Fase 2: Escala e Resiliência (Python Async & RabbitMQ)
 Com o aumento do volume de interações e a necessidade de *background jobs* precisos, o n8n atingiu o seu limite de performance. Para manter o custo zero e aumentar a robustez, o motor foi totalmente reescrito numa arquitetura de microsserviços em Python.
 * **Desacoplamento:** Uma API FastAPI recebe os webhooks e enfileira as mensagens no **RabbitMQ**.
 * **Motor Assíncrono:** Um *Worker* em Python consome a fila ativamente e processa o estado da conversa sem bloqueios (I/O *Non-Blocking*).
 * **Estado Centralizado:** Uso de um banco de dados **PostgreSQL** hospedado gratuitamente, mantendo o estado do funil de vendas seguro e persistente.
+
+![Logs do Webhook recebendo payload da Meta](assets/webhook-logs.gif)
+*API em Python interceptando os webhooks da Meta e enfileirando as requisições no RabbitMQ instantaneamente.*
 
 ## 🛠️ Tecnologias Utilizadas (Stack 100% Gratuita)
 
@@ -40,6 +55,9 @@ Com o aumento do volume de interações e a necessidade de *background jobs* pre
   * Meta Graph API (WhatsApp Business - Cloud API / WhatsApp Flows)
   * Notion API (Gestão de Estoque, Pedidos e Cupons)
   * Chatwoot API (Caixa de entrada para atendimento humano)
+
+![Tabelas de estado no PostgreSQL](assets/postgres-tables.gif)
+*Estrutura relacional no PostgreSQL garantindo a persistência de estado do funil de vendas.*
 
 ## ⚙️ Funcionalidades Core (Engenharia)
 
@@ -56,5 +74,5 @@ O sucesso contínuo desta arquitetura provou que é viável criar automações e
 
 O próximo passo é evoluir este motor para um produto **"White-Label"**. O objetivo é abstrair as regras de negócio da confeitaria e utilizar esta mesma estrutura otimizada, determinística e gratuita como *template* para desenvolver assistentes de vendas, agendamentos e suporte para **outras profissões e nichos de mercado**, mantendo a eficácia com zero custo operacional.
 
-
+---
 *Nota: Por questões de segurança (chaves de API e regras de negócio da TheLordTrufas), este repositório é mantido como privado. Serve como demonstração de engenharia de software pragmática, gestão de estado complexo e integração de sistemas distribuídos sob fortes restrições de custo.*

@@ -68,20 +68,29 @@ def verificar_status_loja(props_reais):
     minutos_atual = (agora.hour * 60) + agora.minute
 
     for turno in [
+        # Segunda a Sexta - Manhã
         {
             "dias": [1, 2, 3, 4, 5],
             "inicio": "Abertura - Manhã (Hora)",
             "fim": "Fechamento - Manhã (Hora)",
         },
+        # Segunda a Sexta - Noite
         {
             "dias": [1, 2, 3, 4, 5],
             "inicio": "Abertura - Noite (Hora)",
             "fim": "Fechamento - Noite (Hora)",
         },
+        # Fim de Semana - Manhã
         {
             "dias": [6, 7],
-            "inicio": "Abertura - FDS (Hora)",
-            "fim": "Fechamento - FDS (Hora)",
+            "inicio": "Abertura - FS - Manhã (Hora)",
+            "fim": "Fechamento - FS - Manhã (Hora)",
+        },
+        # Fim de Semana - Noite
+        {
+            "dias": [6, 7],
+            "inicio": "Abertura - FS - Noite (Hora)",
+            "fim": "Fechamento - FS - Noite (Hora)",
         },
     ]:
         if agora.isoweekday() in turno["dias"]:
@@ -137,11 +146,12 @@ async def atualizar_painel_notion(page_id, status_texto):
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
     }
-    payload = {
-        "properties": {"Status Auto": {"select": {"name": status_texto}}}
-    }
+
+    # Payload assuming it is a 'select' property
+    payload = {"properties": {"Status Auto": {"select": {"name": status_texto}}}}
+
     async with httpx.AsyncClient() as client:
-        await client.patch(url, headers=headers, json=payload)
+        resposta = await client.patch(url, headers=headers, json=payload)
 
 
 async def obter_status_atual_loja():

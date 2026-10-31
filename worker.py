@@ -37,7 +37,7 @@ from subfluxos.existe_cupom import processar_existe_cupom
 from subfluxos.expirou_pagamento import processar_pagamentos_expirados
 from subfluxos.finaliza_pedido import processar_finalizacao_pedido
 from subfluxos.gerenciador_encerramento import processar_encerramento_sessao
-from subfluxos.loja import verificar_status_loja
+from subfluxos.loja import obter_status_atual_loja
 from subfluxos.menu_alternativo import processar_menu_alternativo
 from subfluxos.menu_inicio import processar_menu_inicio
 from subfluxos.navegacao_cardapio import processar_navegacao_cardapio
@@ -662,6 +662,17 @@ async def loop_atualiza_promocoes():
         await asyncio.sleep(43200)  # A cada 12 horas
 
 
+async def loop_status_loja():
+    while True:
+        try:
+            print("A verificar status da loja...")
+            # Chame aqui a sua função de processamento de promoções
+            await obter_status_atual_loja()
+        except Exception as e:
+            print(f"Erro no loop de verificar status da loja: {e}")
+        await asyncio.sleep(300)  # A cada 5 minutos
+
+
 async def main():
     """Inicia o worker conectando-se e escutando as filas do RabbitMQ."""
     print("Iniciando Worker Enterprise com suporte completo aos 42 subfluxos...")
@@ -670,6 +681,7 @@ async def main():
     asyncio.create_task(loop_pagamento_expirado())
     asyncio.create_task(loop_validade_giftback())
     asyncio.create_task(loop_atualiza_promocoes())
+    asyncio.create_task(loop_status_loja())
 
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
 
