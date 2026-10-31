@@ -1,0 +1,8 @@
+fastapi==0.110.0
+uvicorn==0.28.0
+pydantic==2.6.4
+pydantic-settings==2.2.1
+asyncpg==0.29.0          # Driver assíncrono para PostgreSQL
+aio_pika==9.4.0          # Cliente assíncrono para RabbitMQ
+requests==2.31.0         # Para chamadas síncronas se necessário (Notion/Chatwoot/Meta)
+python-dotenv==1.0.1     # Leitura do arquivo .env

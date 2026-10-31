@@ -21,8 +21,3 @@ __pycache__/
 # Ficheiros do Mac/Windows
 .DS_Store
 Thumbs.db
-
-main.py
-subfluxos/
-requirements.txt
-worker.py
