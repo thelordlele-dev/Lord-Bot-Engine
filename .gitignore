@@ -1,0 +1,28 @@
+# Ambientes Virtuais (Onde o Python instala as bibliotecas)
+venv/
+env/
+.env/
+
+# Ficheiros com Senhas e Chaves Secretas
+.env
+secret.json
+credentials.json
+
+# Ficheiros Temporários do Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Ficheiros do VS Code / Editores
+.vscode/
+.idea/
+
+# Ficheiros do Mac/Windows
+.DS_Store
+Thumbs.db
+
+main.py
+subfluxos/
+requirements.txt
+worker.py
