@@ -6,7 +6,7 @@ An automated customer service engine built to scale **TheLordTrufas**'s delivery
 
 ## 📸 Visual Demonstration (ERP Dashboard & Automation)
 
-<video src="https://raw.githubusercontent.com/thelordlele-dev/TheLordTrufas-Bot-Engine/main/assets/notion-erp.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/f24db6c5-54d0-48eb-b09d-55ea92ab2ea6
 _Overview of the Notion-built ERP, managing orders, stock, and payment fees in real-time._
 
 ---
@@ -39,7 +39,7 @@ It started as a complex ecosystem in **n8n**, focused on validating sales automa
 - Real-time synchronization of carts and inventory using Notion as a NoSQL database.
 - Implementation of seamless human handoff using the Chatwoot platform.
 
-<video src="https://raw.githubusercontent.com/thelordlele-dev/TheLordTrufas-Bot-Engine/main/assets/n8n-legacy.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/b8e7c397-0a18-4e10-b71d-62b4d74fc75d
 _Visual mapping of the Finite State Machine operating through n8n nodes._
 
 ### Phase 2: Scale and Resilience (Async Python & RabbitMQ)
@@ -50,7 +50,7 @@ As interaction volume increased and precise background jobs became necessary, n8
 - **Asynchronous Engine:** A Python _Worker_ actively consumes the queue and processes the conversation state without blocking (Non-Blocking I/O).
 - **Centralized State:** Use of a freely hosted **PostgreSQL** database, keeping the sales funnel state secure and persistent.
 
-<video src="https://raw.githubusercontent.com/thelordlele-dev/TheLordTrufas-Bot-Engine/main/assets/webhook-logs.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/f0668b7a-45ed-4102-a80d-e002bd732451
 _Python API intercepting Meta webhooks and instantly queuing requests in RabbitMQ._
 
 ## 🛠️ Technologies Used (100% Free Stack)
@@ -63,7 +63,7 @@ _Python API intercepting Meta webhooks and instantly queuing requests in RabbitM
   - Notion API (Inventory, Orders, and Coupons Management)
   - Chatwoot API (Inbox for human support)
 
-<video src="https://raw.githubusercontent.com/thelordlele-dev/TheLordTrufas-Bot-Engine/main/assets/postgres.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/9a8e8b40-3439-44ae-a6a9-3b6df65c8591
 _Relational structure in PostgreSQL ensuring persistence of the sales funnel state._
 
 ## ⚙️ Core Features (Engineering)
