@@ -1,7 +1,5 @@
 > 🇧🇷 [Ler em Português](README.md)
 
-> 🇧🇷 [Ler em Português](README.md)
-
 # 🍫 TheLordTrufas Bot Engine: From n8n to Enterprise Python Architecture
 
 An automated customer service engine built to scale **TheLordTrufas**'s delivery operation. This project manages a complex WhatsApp sales flow, acting as the central brain between the customer, the product database (Notion), and the human support hub (Chatwoot).
