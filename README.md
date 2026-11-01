@@ -7,6 +7,7 @@ Um motor de atendimento automatizado, construído para escalar a operação de _
 ## 📸 Demonstração Visual (Painel ERP e Automação)
 
 https://github.com/user-attachments/assets/f24db6c5-54d0-48eb-b09d-55ea92ab2ea6
+
 _Visão geral do ERP construído no Notion, gerenciando pedidos, estoque e taxas de pagamento em tempo real._
 
 ---
@@ -40,6 +41,7 @@ Iniciou-se como um ecossistema complexo no **n8n**, focado em validar a automaç
 - Implementação de suporte humano transparente usando a plataforma Chatwoot.
 
 https://github.com/user-attachments/assets/b8e7c397-0a18-4e10-b71d-62b4d74fc75d
+
 _Mapeamento visual da Máquina de Estados Finita operando através dos nós do n8n._
 
 ### Fase 2: Escala e Resiliência (Python Async & RabbitMQ)
@@ -51,6 +53,7 @@ Com o aumento do volume de interações e a necessidade de _background jobs_ pre
 - **Estado Centralizado:** Uso de um banco de dados **PostgreSQL** hospedado gratuitamente, mantendo o estado do funil de vendas seguro e persistente.
 
 https://github.com/user-attachments/assets/f0668b7a-45ed-4102-a80d-e002bd732451
+
 _API em Python interceptando os webhooks da Meta e enfileirando as requisições no RabbitMQ instantaneamente._
 
 ## 🛠️ Tecnologias Utilizadas (Stack 100% Gratuita)
@@ -64,6 +67,7 @@ _API em Python interceptando os webhooks da Meta e enfileirando as requisições
   - Chatwoot API (Caixa de entrada para atendimento humano)
 
 https://github.com/user-attachments/assets/9a8e8b40-3439-44ae-a6a9-3b6df65c8591
+
 _Estrutura relacional no PostgreSQL garantindo a persistência de estado do funil de vendas._
 
 ## ⚙️ Funcionalidades Core (Engenharia)
