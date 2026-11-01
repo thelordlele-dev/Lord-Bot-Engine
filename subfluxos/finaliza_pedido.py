@@ -11,8 +11,8 @@ HEADERS_NOTION = {
     "Content-Type": "application/json",
     "Notion-Version": "2022-06-28",
 }
-DB_CLIENTES = "09ecc826e430417cbca704761420979b"
-DB_RECUPERACAO_VENDAS = "00bbf526fa594184a47bbe954cb01d36"
+DATABASE_ID_RECUPERACAO_VENDAS = os.getenv("DATABASE_ID_RECUPERACAO_VENDAS")
+DATABASE_ID_CLIENTES = os.getenv("DATABASE_ID_CLIENTES")
 
 
 def calcular_regras_giftback(valor_pedido: float) -> dict:
@@ -26,7 +26,7 @@ def calcular_regras_giftback(valor_pedido: float) -> dict:
 
 
 async def buscar_cliente_notion(telefone_real: str) -> str:
-    url = f"https://api.notion.com/v1/databases/{DB_CLIENTES}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_CLIENTES}/query"
     payload = {
         "filter": {"property": "Whatsapp", "rich_text": {"equals": str(telefone_real)}}
     }
@@ -52,7 +52,7 @@ async def atualizar_cliente_notion(cliente_id: str, codigo_gift: str, desconto: 
 
 
 async def limpar_recuperacao_vendas_notion(telefone_real: str):
-    url = f"https://api.notion.com/v1/databases/{DB_RECUPERACAO_VENDAS}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_RECUPERACAO_VENDAS}/query"
     payload = {
         "filter": {
             "and": [

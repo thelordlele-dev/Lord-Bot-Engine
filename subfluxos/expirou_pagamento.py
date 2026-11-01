@@ -11,6 +11,8 @@ CHATWOOT_ACCOUNT_ID = os.getenv("CHATWOOT_ACCOUNT_ID", "1")
 CHATWOOT_BASE_URL = f"{CHATWOOT_URL}/api/v1/accounts/{CHATWOOT_ACCOUNT_ID}"
 
 NOTION_API_URL = "https://api.notion.com/v1"
+DATABASE_ID_RECUPERACAO_VENDAS = os.getenv("DATABASE_ID_RECUPERACAO_VENDAS")
+DATABASE_ID_CARDAPIO = os.getenv("DATABASE_ID_CARDAPIO")
 
 
 async def processar_pagamentos_expirados(
@@ -110,7 +112,7 @@ async def _devolver_estoque_notion(carrinho: list, notion_headers: dict):
     async with httpx.AsyncClient() as client:
         for item_id, qtd_devolver in agrupados.items():
             resp = await client.post(
-                f"{NOTION_API_URL}/databases/0ce7b9883c49441eb6852a69e6894667/query",
+                f"{NOTION_API_URL}/databases/{DATABASE_ID_CARDAPIO}/query",
                 json={
                     "filter": {"property": "ID", "rich_text": {"equals": str(item_id)}}
                 },
@@ -141,7 +143,7 @@ async def _remover_carrinho_abandonado_notion(telefone: str, notion_headers: dic
         tel_num = int("".join(filter(str.isdigit, str(telefone))))
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{NOTION_API_URL}/databases/00bbf526fa594184a47bbe954cb01d36/query",
+                f"{NOTION_API_URL}/databases/{DATABASE_ID_RECUPERACAO_VENDAS}/query",
                 json={
                     "filter": {"property": "Whatsapp", "number": {"equals": tel_num}}
                 },

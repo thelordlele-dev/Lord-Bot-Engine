@@ -11,11 +11,11 @@ HEADERS_NOTION = {
     "Content-Type": "application/json",
     "Notion-Version": "2022-06-28",
 }
-DB_RECUPERACAO_VENDAS = "00bbf526fa594184a47bbe954cb01d36"
+DATABASE_ID_RECUPERACAO_VENDAS = os.getenv("DATABASE_ID_RECUPERACAO_VENDAS")
 
 
 async def buscar_carrinhos_abandonados_notion() -> list:
-    url = f"https://api.notion.com/v1/databases/{DB_RECUPERACAO_VENDAS}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_RECUPERACAO_VENDAS}/query"
     payload = {
         "filter": {"property": "Recuperar", "formula": {"checkbox": {"equals": True}}}
     }

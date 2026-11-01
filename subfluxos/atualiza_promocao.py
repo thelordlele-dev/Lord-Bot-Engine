@@ -10,11 +10,11 @@ HEADERS_NOTION = {
     "Content-Type": "application/json",
     "Notion-Version": "2022-06-28",
 }
-DB_PRECOS_VENDA = "52f0d62af72d43028681560c3a0d6031"
+DATABASE_ID_PRECOS_VENDA = os.getenv("DATABASE_ID_PRECOS_VENDA")
 
 
 async def buscar_promocoes_expiradas_notion() -> list:
-    url = f"https://api.notion.com/v1/databases/{DB_PRECOS_VENDA}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_PRECOS_VENDA}/query"
     payload = {
         "filter": {
             "property": "Promo Expirou?",

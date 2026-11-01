@@ -12,7 +12,7 @@ HEADERS_NOTION = {
     "Content-Type": "application/json",
     "Notion-Version": "2022-06-28",
 }
-DB_AVALIACAO_ATENDIMENTO = "2727a7a879af80758babc3eed41710e2"
+DATABASE_ID_AVALIACAO_ATENDIMENTO = os.getenv("DATABASE_ID_AVALIACAO_ATENDIMENTO", "")
 
 
 async def criar_avaliacao_atendimento_notion(
@@ -44,7 +44,7 @@ async def criar_avaliacao_atendimento_notion(
     }
 
     payload = {
-        "parent": {"database_id": DB_AVALIACAO_ATENDIMENTO},
+        "parent": {"database_id": DATABASE_ID_AVALIACAO_ATENDIMENTO},
         "properties": properties,
     }
 

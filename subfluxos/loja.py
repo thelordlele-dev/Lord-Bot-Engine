@@ -9,7 +9,7 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 NOTION_TOKEN = os.getenv("NOTION_API_KEY")
-DATABASE_ID_LOJA = "2357a7a879af8065b815c6f88bc3c5bb"
+DATABASE_ID_LOJA = os.getenv("DATABASE_ID_LOJA")
 
 
 def converter_para_minutos(valor_float):

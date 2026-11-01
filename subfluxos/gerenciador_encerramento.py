@@ -6,7 +6,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 NOTION_API_URL = "https://api.notion.com/v1"
-NOTION_DATABASE_PRODUTOS_ID = "0ce7b9883c49441eb6852a69e6894667"
+DATABASE_ID_CARDAPIO = os.getenv("DATABASE_ID_CARDAPIO")
 NOTION_TOKEN = os.getenv("NOTION_API_KEY", "")
 
 
@@ -44,7 +44,7 @@ async def processar_encerramento_sessao(
         if agrupados:
             async with httpx.AsyncClient() as client:
                 for item_id, qtd_a_devolver in agrupados.items():
-                    query_url = f"{NOTION_API_URL}/databases/{NOTION_DATABASE_PRODUTOS_ID}/query"
+                    query_url = f"{NOTION_API_URL}/databases/{DATABASE_ID_CARDAPIO}/query"
                     resp_query = await client.post(
                         query_url,
                         json={

@@ -10,13 +10,13 @@ HEADERS_NOTION = {
     "Content-Type": "application/json",
     "Notion-Version": "2022-06-28",
 }
-DB_FLUXO_CAIXA = "2367a7a879af80e2837ac574f098c30f"
+DATABASE_ID_FLUXO_CAIXA = os.getenv("DATABASE_ID_FLUXO_CAIXA", "")
 
 
 async def atualizar_avaliacao_notion(
     numero_pedido: str, nota_estrelas: str, comentario: str
 ) -> bool:
-    url_query = f"https://api.notion.com/v1/databases/{DB_FLUXO_CAIXA}/query"
+    url_query = f"https://api.notion.com/v1/databases/{DATABASE_ID_FLUXO_CAIXA}/query"
     payload_query = {
         "filter": {"property": "Descrição", "title": {"equals": f"TLF-{numero_pedido}"}}
     }

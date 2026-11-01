@@ -1,11 +1,13 @@
 import json
 import logging
+import os
 import httpx
+
 
 logger = logging.getLogger(__name__)
 
 NOTION_API_URL = "https://api.notion.com/v1"
-NOTION_DATABASE_CLIENTES_ID = "09ecc826e430417cbca704761420979b"
+DATABASE_ID_CLIENTES = os.getenv("DATABASE_ID_CLIENTES")
 
 
 async def processar_cadastro_nome(
@@ -77,7 +79,7 @@ async def _criar_pagina_notion(
     nome_cliente: str, telefone: str, genero: str, user_id: str, notion_headers: dict
 ):
     payload = {
-        "parent": {"database_id": NOTION_DATABASE_CLIENTES_ID},
+        "parent": {"database_id": DATABASE_ID_CLIENTES},
         "properties": {
             "Nome": {"title": [{"text": {"content": nome_cliente}}]},
             "Whatsapp": {"rich_text": [{"text": {"content": str(telefone)}}]},

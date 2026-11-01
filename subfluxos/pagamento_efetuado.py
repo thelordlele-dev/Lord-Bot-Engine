@@ -12,10 +12,10 @@ HEADERS_NOTION = {
     "Notion-Version": "2022-06-28",
 }
 
-DB_FLUXO_CAIXA = "2367a7a879af80e2837ac574f098c30f"
-DB_FATURAMENTO = "2367a7a879af8090b753f153653e59ab"
-DB_CLIENTES = "09ecc826e430417cbca704761420979b"
-DB_CUPONS = "2897a7a879af804891d7fc0db15b20c0"
+DATABASE_ID_FLUXO_CAIXA = os.getenv("DATABASE_ID_FLUXO_CAIXA")
+DATABASE_ID_FATURAMENTO = os.getenv("DATABASE_ID_FATURAMENTO")
+DATABASE_ID_CLIENTES = os.getenv("DATABASE_ID_CLIENTES")
+DATABASE_ID_CUPONS = os.getenv("DATABASE_ID_CUPONS")
 
 
 def formatar_carrinho_em_linha(carrinho_json) -> str:
@@ -31,7 +31,7 @@ def formatar_carrinho_em_linha(carrinho_json) -> str:
 
 
 async def buscar_faturamento_dia_notion() -> str:
-    url = f"https://api.notion.com/v1/databases/{DB_FATURAMENTO}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_FATURAMENTO}/query"
     async with httpx.AsyncClient() as client:
         response = await client.post(url, headers=HEADERS_NOTION, json={})
         results = response.json().get("results", [])
@@ -39,7 +39,7 @@ async def buscar_faturamento_dia_notion() -> str:
 
 
 async def buscar_cliente_notion(telefone_real: str) -> str:
-    url = f"https://api.notion.com/v1/databases/{DB_CLIENTES}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_CLIENTES}/query"
     payload = {
         "filter": {"property": "Whatsapp", "rich_text": {"equals": str(telefone_real)}}
     }
@@ -65,7 +65,7 @@ async def criar_registro_fluxo_caixa(
         properties["Clientes"] = {"relation": [{"id": cliente_id}]}
 
     payload = {
-        "parent": {"database_id": DB_FLUXO_CAIXA},
+        "parent": {"database_id": DATABASE_ID_FLUXO_CAIXA},
         "properties": properties,
         "children": [
             {
@@ -84,7 +84,7 @@ async def criar_registro_fluxo_caixa(
 
 
 async def vincular_cupom_notion(cupom_codigo: str, id_fluxo_caixa: str):
-    url = f"https://api.notion.com/v1/databases/{DB_CUPONS}/query"
+    url = f"https://api.notion.com/v1/databases/{DATABASE_ID_CUPONS}/query"
     payload = {"filter": {"property": "Cupom", "title": {"equals": str(cupom_codigo)}}}
     async with httpx.AsyncClient() as client:
         response = await client.post(url, headers=HEADERS_NOTION, json=payload)

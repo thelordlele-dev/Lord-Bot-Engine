@@ -6,6 +6,7 @@ import os
 logger = logging.getLogger(__name__)
 NOTION_API_URL = "https://api.notion.com/v1"
 NOTION_TOKEN = os.getenv("NOTION_API_KEY", "")
+DATABASE_ID_CARDAPIO = os.getenv("DATABASE_ID_CARDAPIO", "")
 
 
 async def processar_busca_cardapio(
@@ -38,7 +39,7 @@ async def processar_busca_cardapio(
         except Exception:
             mapa_id = {}
     else:
-        query_url = f"{NOTION_API_URL}/databases/0ce7b9883c49441eb6852a69e6894667/query"
+        query_url = f"{NOTION_API_URL}/databases/{DATABASE_ID_CARDAPIO}/query"
         payload_notion = {
             "filter": {
                 "and": [

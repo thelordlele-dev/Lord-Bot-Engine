@@ -5,7 +5,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 NOTION_API_URL = "https://api.notion.com/v1"
-NOTION_DATABASE_CLIENTES_ID = "09ecc826e430417cbca704761420979b"
+DATABASE_ID_CLIENTES = os.getenv("DATABASE_ID_CLIENTES")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
 
@@ -88,7 +88,7 @@ async def _atualizar_notion_cliente(
     try:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
-                f"{NOTION_API_URL}/databases/{NOTION_DATABASE_CLIENTES_ID}/query",
+                f"{NOTION_API_URL}/databases/{DATABASE_ID_CLIENTES}/query",
                 json={
                     "filter": {
                         "property": "Whatsapp",
