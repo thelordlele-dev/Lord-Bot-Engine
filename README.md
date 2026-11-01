@@ -13,7 +13,7 @@ _Visão geral do ERP construído no Notion, gerenciando pedidos, estoque e taxas
 
 ## 💡 Filosofia do Projeto
 
-### 1. UX Interativa vs. IA Generativa (Zero Hallucinations)
+### 1. UX Interativa vs. IA Generativa (Zero Alucinações)
 
 O desenvolvimento deste projeto coincidiu com o pico do _hype_ em torno de agentes de atendimento baseados em Inteligência Artificial generativa (LLMs). Contudo, foi tomada a decisão arquitetural consciente de **NÃO utilizar IA generativa** no _core_ do atendimento.
 Os motivos foram estritamente focados na excelência da operação:
