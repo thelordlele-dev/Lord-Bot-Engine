@@ -1,6 +1,8 @@
 > 🇺🇸 [Read this in English](README.en.md)
 
-# 🍫 TheLordTrufas Bot Engine: De n8n para Arquitetura Python Enterprise
+# ⚠️ EM DESENVOLVIMENTO ⚠️
+
+# 🤖 Lord-Bot-Engine: De n8n para Arquitetura Python Enterprise
 
 Um motor de atendimento automatizado, construído para escalar a operação de _delivery_ da **TheLordTrufas**. Este projeto gere um fluxo complexo de vendas via WhatsApp, atuando como o cérebro central entre o cliente, o banco de dados de produtos (Notion) e a central de atendimento humano (Chatwoot).
 
