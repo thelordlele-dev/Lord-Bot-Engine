@@ -27,7 +27,7 @@ async def processar_sessoes_expiradas(
     query_aviso = """
         SELECT jid, carrinho_json, primeiro_nome, telefone_real, expirando 
         FROM conversas_bot 
-        WHERE (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM ultima_interacao)) > 1200 
+        WHERE (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM ultima_interacao)) > 600 
           AND is_bot_paused = FALSE 
           AND estado_conversa != 'pagamento_concluido' 
           AND estado_conversa != 'cliente_existe'
