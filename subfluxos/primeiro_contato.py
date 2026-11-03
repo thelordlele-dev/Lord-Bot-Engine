@@ -1,7 +1,28 @@
 import uuid
+from subfluxos.loja import obter_status_atual_loja
 
 
 async def gerar_mensagem_boas_vindas(jid, telefone_real):
+    # 1. VERIFICA O STATUS DA LOJA PRIMEIRO
+    status_loja = await obter_status_atual_loja()
+
+    # 2. SE ESTIVER FECHADA, BARRA O CLIENTE AQUI!
+    if not status_loja["aberta"]:
+        motivo = status_loja.get("motivo", "Fechada.")
+        payload_fechado = {
+            "messaging_product": "whatsapp",
+            "to": telefone_real,
+            "recipient_type": "individual",
+            "type": "text",
+            "text": {
+                "body": f"_*👸🏾 Kakaw - TheLordTrufas.*_\n\nOlá, infelizmente não podemos seguir com o seu atendimento agora.\n\n{motivo}"
+            },
+        }
+        # Retorna o status 'ignorar_mensagem' para a máquina de estados não avançar o cliente
+        sql_manter = f"UPDATE conversas_bot SET estado_conversa = 'primeiro_contato' WHERE jid = '{jid}';"
+        return {"sql_update": sql_manter, "payload": payload_fechado}
+
+    # 3. SE ESTIVER ABERTA, SEGUE O FLUXO NORMAL
     flow_token = uuid.uuid4().hex
 
     sql_insercao = f"""

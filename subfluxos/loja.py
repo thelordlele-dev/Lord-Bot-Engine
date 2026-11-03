@@ -28,10 +28,7 @@ def verificar_status_loja(props_reais):
     )
     motivo_personalizado_notion = "Estamos fechados no momento."
     if chave_motivo:
-        if (
-            "rich_text" in props_reais[chave_motivo]
-            and props_reais[chave_motivo]["rich_text"]
-        ):
+        if props_reais[chave_motivo].get("rich_text"):
             motivo_personalizado_notion = "".join(
                 [
                     t.get("plain_text", "")
@@ -45,11 +42,15 @@ def verificar_status_loja(props_reais):
     status_manual = "Auto"
     if chave_manual:
         info_coluna = props_reais[chave_manual]
-        status_manual = (
-            info_coluna.get("select", {}).get("name", "Auto")
-            if "select" in info_coluna
-            else info_coluna.get("status", {}).get("name", "Auto")
-        )
+
+        # BLINDAGEM ANTI-CRASH: Evita o erro quando o Notion devolve "null" num campo vazio
+        select_data = info_coluna.get("select")
+        status_data = info_coluna.get("status")
+
+        if select_data:
+            status_manual = select_data.get("name", "Auto")
+        elif status_data:
+            status_manual = status_data.get("name", "Auto")
 
     if status_manual == "Aberta":
         return {
@@ -68,25 +69,21 @@ def verificar_status_loja(props_reais):
     minutos_atual = (agora.hour * 60) + agora.minute
 
     for turno in [
-        # Segunda a Sexta - Manhã
         {
             "dias": [1, 2, 3, 4, 5],
             "inicio": "Abertura - Manhã (Hora)",
             "fim": "Fechamento - Manhã (Hora)",
         },
-        # Segunda a Sexta - Noite
         {
             "dias": [1, 2, 3, 4, 5],
             "inicio": "Abertura - Noite (Hora)",
             "fim": "Fechamento - Noite (Hora)",
         },
-        # Fim de Semana - Manhã
         {
             "dias": [6, 7],
             "inicio": "Abertura - FS - Manhã (Hora)",
             "fim": "Fechamento - FS - Manhã (Hora)",
         },
-        # Fim de Semana - Noite
         {
             "dias": [6, 7],
             "inicio": "Abertura - FS - Noite (Hora)",
@@ -147,11 +144,19 @@ async def atualizar_painel_notion(page_id, status_texto):
         "Content-Type": "application/json",
     }
 
-    # Payload assuming it is a 'select' property
     payload = {"properties": {"Status Auto": {"select": {"name": status_texto}}}}
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         resposta = await client.patch(url, headers=headers, json=payload)
+
+    if not resposta.is_success:
+        logger.error(
+            "Falha ao atualizar 'Status Auto' no Notion: HTTP %s - %s",
+            resposta.status_code,
+            resposta.text[:300],
+        )
+        return False
+    return True
 
 
 async def obter_status_atual_loja():
@@ -161,9 +166,21 @@ async def obter_status_atual_loja():
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         resposta = await client.post(url, headers=headers)
-        dados_notion = resposta.json()
+
+    if not resposta.is_success:
+        logger.error(
+            "Falha ao consultar a tabela da Loja no Notion: HTTP %s - %s",
+            resposta.status_code,
+            resposta.text[:300],
+        )
+        return {
+            "aberta": False,
+            "motivo": f"Falha ao consultar o Notion (HTTP {resposta.status_code}).",
+        }
+
+    dados_notion = resposta.json()
 
     if not dados_notion.get("results"):
         return {
@@ -186,11 +203,15 @@ async def obter_status_atual_loja():
     status_visual_atual = ""
     if chave_auto:
         coluna_auto = primeira_linha["properties"][chave_auto]
-        status_visual_atual = (
-            coluna_auto.get("select", {}).get("name", "")
-            if "select" in coluna_auto
-            else coluna_auto.get("status", {}).get("name", "")
-        )
+
+        # BLINDAGEM ANTI-CRASH: Evita quebrar ao atualizar o painel do Notion
+        select_data = coluna_auto.get("select")
+        status_data = coluna_auto.get("status")
+
+        if select_data:
+            status_visual_atual = select_data.get("name", "")
+        elif status_data:
+            status_visual_atual = status_data.get("name", "")
 
     if novo_status != status_visual_atual:
         await atualizar_painel_notion(primeira_linha["id"], novo_status)
