@@ -22,8 +22,10 @@ async def buscar_promocoes_expiradas_notion() -> list:
         }
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         response = await client.post(url, headers=HEADERS_NOTION, json=payload)
+        # Antes, erro do Notion (401/400) virava lista vazia = "0 promoções" (falha silenciosa).
+        response.raise_for_status()
         return [
             page["id"] for page in response.json().get("results", []) if page.get("id")
         ]
@@ -38,9 +40,17 @@ async def atualizar_produto_para_normal_notion(page_id: str) -> bool:
         }
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         response = await client.patch(url, headers=HEADERS_NOTION, json=payload)
-        return response.status_code in [200, 201]
+        if response.status_code not in (200, 201):
+            logger.error(
+                "Falha ao normalizar promoção %s: HTTP %s - %s",
+                page_id,
+                response.status_code,
+                response.text[:300],
+            )
+            return False
+        return True
 
 
 async def processar_atualizacao_promocoes() -> dict:

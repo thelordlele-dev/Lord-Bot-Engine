@@ -5,7 +5,7 @@ import httpx
 import aio_pika
 from dotenv import load_dotenv
 
-from config.database import obter_conexao, db_pool
+from config.database import obter_conexao, liberar_conexao, conectar_db
 
 # ========================================================
 # IMPORTAÇÃO DOS SUBFLUXOS DO SISTEMA THELORDTRUFAS
@@ -71,7 +71,7 @@ async def disparar_whatsapp(payload: dict):
         "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
         "Content-Type": "application/json",
     }
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             response = await client.post(url, headers=headers, json=payload)
             print(f"Resposta Meta WhatsApp: {response.status_code} - {response.text}")
@@ -133,15 +133,25 @@ async def processar_maquina_estados(
     jid: str, telefone_real: str, primeiro_nome: str, entrada_cliente: str
 ):
     """
-    Motor central da máquina de estados com injeção automática de dependências e contexto unificado.
+    Wrapper: pega UMA conexão e garante a devolução em TODOS os caminhos
+    (return antecipado, exceção, timeout/cancelamento do wait_for).
     """
-    conexao = await obter_conexao()
-    if not conexao:
-        print(
-            f"Erro crítico: Não foi possível obter conexão com o PostgreSQL para o JID {jid}"
+    conexao = await obter_conexao()  # levanta erro após 10s se a pool esgotar
+    try:
+        await _processar_maquina_estados(
+            conexao, jid, telefone_real, primeiro_nome, entrada_cliente
         )
-        return
+    finally:
+        await liberar_conexao(conexao)
 
+
+async def _processar_maquina_estados(
+    conexao, jid: str, telefone_real: str, primeiro_nome: str, entrada_cliente: str
+):
+    """
+    Motor central da máquina de estados com injeção automática de dependências e contexto unificado.
+    A conexão é recebida pronta e devolvida pelo wrapper acima (não liberar aqui).
+    """
     is_bot_paused = False
 
     try:
@@ -192,7 +202,7 @@ async def processar_maquina_estados(
 
     except Exception as e:
         print(f"Erro ao consultar base de dados para o JID {jid}: {e}")
-        # Retirado o db_pool.release() daqui! A devolução da conexão acontece no finally.
+        # A conexão é devolvida pelo wrapper processar_maquina_estados (finally).
         return
 
     resultado = None
@@ -240,7 +250,7 @@ async def processar_maquina_estados(
         print(
             f"🤫 [BOT PAUSADO] Cliente {jid} em atendimento humano. Ignorando mensagem do usuário."
         )
-        # Retirado o db_pool.release() daqui! A devolução da conexão acontece no finally.
+        # A conexão é devolvida pelo wrapper processar_maquina_estados (finally).
         return
     # ----------------------------------------------------
 
@@ -533,10 +543,9 @@ async def processar_maquina_estados(
                     await disparar_whatsapp(payload_final)
 
     except Exception as e:
-        print(f"Erro ao processar máquina de estados para JID {jid}: {e}")
-    finally:
-        if db_pool:
-            await db_pool.release(conexao)
+        print(
+            f"Erro ao processar máquina de estados para JID {jid}: {type(e).__name__}: {e}"
+        )
 
 
 # ========================================================
@@ -544,46 +553,67 @@ async def processar_maquina_estados(
 # ========================================================
 
 
+def _headers_notion() -> dict:
+    # O Notion EXIGE o header Notion-Version; sem ele responde 400 e as rotinas falhavam em silêncio.
+    return {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+    }
+
+
+async def _chamar(func, **kwargs):
+    """Aceita subfluxo síncrono ou assíncrono."""
+    resultado = func(**kwargs)
+    if asyncio.iscoroutine(resultado):
+        resultado = await resultado
+    return resultado
+
+
+async def _rodar_rotina_background(
+    func,
+    usar_externos: bool = True,
+    executar_background: bool = True,
+    timeout: float = 120.0,
+):
+    """
+    Pega uma conexão, roda a rotina com TIMEOUT e devolve a conexão sempre.
+    Se a rotina travar, o timeout levanta erro (visível no log) em vez de congelar o loop.
+    """
+    conexao = await obter_conexao()
+    try:
+        kwargs = {"db_connection": conexao}
+        if usar_externos:
+            kwargs.update(
+                notion_headers=_headers_notion(),
+                chatwoot_headers={"api_access_token": os.getenv("CHATWOOT_TOKEN", "")},
+                whatsapp_api_config={
+                    "url": WHATSAPP_API_URL,
+                    "phone_id": WHATSAPP_PHONE_NUMBER_ID,
+                    "token": WHATSAPP_ACCESS_TOKEN,
+                },
+            )
+        resultado = await asyncio.wait_for(_chamar(func, **kwargs), timeout=timeout)
+        if executar_background:
+            # 🚀 Executa SQL e envia o Zap retornados pela rotina
+            await asyncio.wait_for(
+                executar_resultado_background(resultado, conexao), timeout=timeout
+            )
+        return resultado
+    finally:
+        await liberar_conexao(conexao)
+
+
 async def loop_sessoes_expiradas():
     """Limpa sessões expiradas em background periodicamente."""
     while True:
         try:
             print("A limpar sessões e atendimentos expirados...")
-            conexao = await obter_conexao()
-            try:
-                notion_headers = {"Authorization": f"Bearer {NOTION_TOKEN}"}
-                chatwoot_headers = {"api_access_token": os.getenv("CHATWOOT_TOKEN", "")}
-                whatsapp_config = {
-                    "url": WHATSAPP_API_URL,
-                    "phone_id": WHATSAPP_PHONE_NUMBER_ID,
-                    "token": WHATSAPP_ACCESS_TOKEN,
-                }
-
-                if asyncio.iscoroutinefunction(processar_sessoes_expiradas):
-                    resultado = await processar_sessoes_expiradas(
-                        db_connection=conexao,
-                        notion_headers=notion_headers,
-                        chatwoot_headers=chatwoot_headers,
-                        whatsapp_api_config=whatsapp_config,
-                    )
-                else:
-                    resultado = processar_sessoes_expiradas(
-                        db_connection=conexao,
-                        notion_headers=notion_headers,
-                        chatwoot_headers=chatwoot_headers,
-                        whatsapp_api_config=whatsapp_config,
-                    )
-
-                # 🚀 MAGIA DA TRANSIÇÃO DO BACKGROUND: Executa SQL e envia o Zap!
-                await executar_resultado_background(resultado, conexao)
-
-            finally:
-                if db_pool:
-                    await db_pool.release(conexao)
+            resultado = await _rodar_rotina_background(processar_sessoes_expiradas)
+            print(f"Resultado da limpeza de sessões: {resultado}")
         except Exception as e:
-            print(f"Erro no loop de sessões expiradas: {e}")
+            print(f"Erro no loop de sessões expiradas: {type(e).__name__}: {e}")
 
-        # Reduzido para 1 minuto (60s) para uma resposta precisa
         await asyncio.sleep(60)
 
 
@@ -592,38 +622,9 @@ async def loop_pagamento_expirado():
     while True:
         try:
             print("A verificar pagamentos expirados...")
-            conexao = await obter_conexao()
-            try:
-                notion_headers = {"Authorization": f"Bearer {NOTION_TOKEN}"}
-                chatwoot_headers = {"api_access_token": os.getenv("CHATWOOT_TOKEN", "")}
-                whatsapp_config = {
-                    "url": WHATSAPP_API_URL,
-                    "phone_id": WHATSAPP_PHONE_NUMBER_ID,
-                    "token": WHATSAPP_ACCESS_TOKEN,
-                }
-                if asyncio.iscoroutinefunction(processar_pagamentos_expirados):
-                    resultado = await processar_pagamentos_expirados(
-                        db_connection=conexao,
-                        notion_headers=notion_headers,
-                        chatwoot_headers=chatwoot_headers,
-                        whatsapp_api_config=whatsapp_config,
-                    )
-                else:
-                    resultado = processar_pagamentos_expirados(
-                        db_connection=conexao,
-                        notion_headers=notion_headers,
-                        chatwoot_headers=chatwoot_headers,
-                        whatsapp_api_config=whatsapp_config,
-                    )
-
-                # 🚀 MAGIA DA TRANSIÇÃO
-                await executar_resultado_background(resultado, conexao)
-
-            finally:
-                if db_pool:
-                    await db_pool.release(conexao)
+            await _rodar_rotina_background(processar_pagamentos_expirados)
         except Exception as e:
-            print(f"Erro no loop de pagamento_expirado: {e}")
+            print(f"Erro no loop de pagamento_expirado: {type(e).__name__}: {e}")
 
         await asyncio.sleep(60)
 
@@ -633,19 +634,14 @@ async def loop_validade_giftback():
     while True:
         try:
             print("A verificar validade de cupons e giftbacks...")
-            conexao = await obter_conexao()
-            try:
-                if asyncio.iscoroutinefunction(verificar_e_expirar_cupons):
-                    resultado = await verificar_e_expirar_cupons(db_connection=conexao)
-                else:
-                    resultado = verificar_e_expirar_cupons(db_connection=conexao)
-
-                print(f"Resultado da limpeza de cupons: {resultado}")
-            finally:
-                if db_pool:
-                    await db_pool.release(conexao)
+            resultado = await _rodar_rotina_background(
+                verificar_e_expirar_cupons,
+                usar_externos=False,
+                executar_background=False,
+            )
+            print(f"Resultado da limpeza de cupons: {resultado}")
         except Exception as e:
-            print(f"Erro no loop de validade de cupons: {e}")
+            print(f"Erro no loop de validade de cupons: {type(e).__name__}: {e}")
 
         # Roda a cada 1 hora (3600 segundos), igual ao Schedule Trigger do n8n
         await asyncio.sleep(3600)
@@ -656,9 +652,9 @@ async def loop_atualiza_promocoes():
         try:
             print("A verificar validade de promoções...")
             # Chame aqui a sua função de processamento de promoções
-            await processar_atualizacao_promocoes()
+            await asyncio.wait_for(processar_atualizacao_promocoes(), timeout=120)
         except Exception as e:
-            print(f"Erro no loop de atualização de promoções: {e}")
+            print(f"Erro no loop de atualização de promoções: {type(e).__name__}: {e}")
         await asyncio.sleep(43200)  # A cada 12 horas
 
 
@@ -667,15 +663,60 @@ async def loop_status_loja():
         try:
             print("A verificar status da loja...")
             # Chame aqui a sua função de processamento de promoções
-            await obter_status_atual_loja()
+            await asyncio.wait_for(obter_status_atual_loja(), timeout=60)
         except Exception as e:
-            print(f"Erro no loop de verificar status da loja: {e}")
+            print(f"Erro no loop de verificar status da loja: {type(e).__name__}: {e}")
         await asyncio.sleep(300)  # A cada 5 minutos
 
 
+async def processar_mensagem_rabbitmq(message: aio_pika.IncomingMessage):
+    """Processa clientes de forma PARALELA. Um cliente travado não afeta os outros."""
+    async with message.process():
+        jid = None
+        telefone_real = None
+        try:
+            dados = json.loads(message.body.decode())
+            print(f">>> [RABBITMQ] Nova mensagem! Dados: {dados}")
+
+            jid = dados.get("jid")
+            telefone_real = dados.get("telefone_real", jid)
+            primeiro_nome = dados.get("primeiro_nome", "Cliente")
+            entrada_cliente = dados.get("entrada_cliente", "")
+
+            # Limite máximo de 45 segundos por atendimento. Evita deadlocks.
+            await asyncio.wait_for(
+                processar_maquina_estados(
+                    jid, telefone_real, primeiro_nome, entrada_cliente
+                ),
+                timeout=45.0,
+            )
+        except asyncio.TimeoutError:
+            print(
+                f"⏳ TIMEOUT: O processamento do JID {jid} travou. A enviar mensagem de resgate."
+            )
+            if telefone_real:
+                await disparar_whatsapp(
+                    {
+                        "messaging_product": "whatsapp",
+                        "recipient_type": "individual",
+                        "to": telefone_real,
+                        "type": "text",
+                        "text": {
+                            "body": "Desculpe, tivemos uma instabilidade técnica momentânea. 🔄 Por favor, envie uma nova mensagem para retomarmos o seu atendimento!"
+                        },
+                    }
+                )
+        except Exception as e:
+            # Não deixa a exceção escapar: o message.process() rejeitaria (descartaria) a mensagem em silêncio.
+            print(f"Erro ao processar mensagem do JID {jid}: {type(e).__name__}: {e}")
+
+
 async def main():
-    """Inicia o worker conectando-se e escutando as filas do RabbitMQ."""
+    """Inicia o worker conectando-se e escutando as filas do RabbitMQ de forma concorrente."""
     print("Iniciando Worker Enterprise com suporte completo aos 42 subfluxos...")
+
+    # Cria a pool UMA vez, antes de qualquer loop (evita várias pools em paralelo)
+    await conectar_db()
 
     asyncio.create_task(loop_sessoes_expiradas())
     asyncio.create_task(loop_pagamento_expirado())
@@ -683,55 +724,56 @@ async def main():
     asyncio.create_task(loop_atualiza_promocoes())
     asyncio.create_task(loop_status_loja())
 
-    connection = await aio_pika.connect_robust(RABBITMQ_URL)
+    while True:
+        try:
+            connection = await aio_pika.connect_robust(RABBITMQ_URL)
 
-    async with connection:
-        channel = await connection.channel()
-        await channel.set_qos(prefetch_count=20)
+            async with connection:
+                channel = await connection.channel()
+                # prefetch <= max_size da pool (10): evita disputa de conexões
+                await channel.set_qos(prefetch_count=8)
 
-        fila_whatsapp = await channel.declare_queue(
-            "novos_pedidos", durable=True, arguments={"x-queue-type": "quorum"}
-        )
-        await channel.declare_queue(
-            "pagamento_efetuado", durable=True, arguments={"x-queue-type": "quorum"}
-        )
-        await channel.declare_queue(
-            "cria_pagamento", durable=True, arguments={"x-queue-type": "quorum"}
-        )
-        await channel.declare_queue(
-            "finaliza_pedido", durable=True, arguments={"x-queue-type": "quorum"}
-        )
-        await channel.declare_queue(
-            "status_pedido", durable=True, arguments={"x-queue-type": "quorum"}
-        )
-        await channel.declare_queue(
-            "retorna_bot", durable=True, arguments={"x-queue-type": "quorum"}
-        )
+                fila_whatsapp = await channel.declare_queue(
+                    "novos_pedidos", durable=True, arguments={"x-queue-type": "quorum"}
+                )
+                await channel.declare_queue(
+                    "pagamento_efetuado",
+                    durable=True,
+                    arguments={"x-queue-type": "quorum"},
+                )
+                await channel.declare_queue(
+                    "cria_pagamento", durable=True, arguments={"x-queue-type": "quorum"}
+                )
+                await channel.declare_queue(
+                    "finaliza_pedido",
+                    durable=True,
+                    arguments={"x-queue-type": "quorum"},
+                )
+                await channel.declare_queue(
+                    "status_pedido", durable=True, arguments={"x-queue-type": "quorum"}
+                )
+                await channel.declare_queue(
+                    "retorna_bot", durable=True, arguments={"x-queue-type": "quorum"}
+                )
 
-        print("Worker a escutar todas as filas com sucesso!")
+                print(
+                    "Worker a escutar todas as filas com sucesso e em modo concorrente!"
+                )
 
-        async with fila_whatsapp.iterator() as queue_iter:
-            async for message in queue_iter:
-                async with message.process():
-                    try:
-                        dados = json.loads(message.body.decode())
-                        print(
-                            f">>> [RABBITMQ] Mensagem nova recebida na fila! Dados: {dados}"
-                        )
+                await fila_whatsapp.consume(processar_mensagem_rabbitmq)
 
-                        jid = dados.get("jid")
-                        telefone_real = dados.get("telefone_real", jid)
-                        primeiro_nome = dados.get("primeiro_nome", "Cliente")
-                        entrada_cliente = dados.get("entrada_cliente", "")
+                # Mantém a ligação viva em background para o .consume() trabalhar livremente
+                await asyncio.Future()
 
-                        await processar_maquina_estados(
-                            jid, telefone_real, primeiro_nome, entrada_cliente
-                        )
-                    except Exception as e:
-                        print(
-                            f"Erro ao processar mensagem na fila 'novos_pedidos': {e}"
-                        )
+        except Exception as e:
+            print(
+                f"Erro na ligação ao RabbitMQ: {type(e).__name__}: {e}. A tentar reconectar em 5 segundos..."
+            )
+            await asyncio.sleep(5)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Worker encerrado manualmente pelo utilizador.")
