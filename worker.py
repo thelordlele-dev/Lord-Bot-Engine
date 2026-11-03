@@ -318,6 +318,19 @@ async def _processar_maquina_estados(
     }
     chatwoot_headers = {"api_access_token": os.getenv("CHATWOOT_TOKEN", "")}
 
+    # ==============================================================
+    # 🛤️ RASTREADOR VISUAL DE SUBFLUXOS NO TERMINAL
+    # ==============================================================
+    entrada_limpa = (
+        str(entrada_cliente).strip() if not eh_formulario else "[Formulário Flow]"
+    )
+    print(
+        f"\n[ROTA ATIVA] Cliente: {primeiro_nome} "
+        f"| Subfluxo: '{estado_atual}' "
+        f"| Entrada: '{entrada_limpa}'"
+    )
+    # ==============================================================
+
     try:
         if estado_atual == "ignorar_mensagem":
             pass
@@ -364,13 +377,26 @@ async def _processar_maquina_estados(
                 jid, jid, primeiro_nome, entrada_cliente, cliente_db
             )
         elif estado_atual and estado_atual.startswith("visualizando_cardapio"):
-            resultado = processar_navegacao_cardapio(
+            # O worker precisa ler a página e o mapa do banco de dados e passar para a função
+            pagina_atual = int(cliente_db.get("pagina_atual", 1))
+            mapa_id_str = cliente_db.get("mapa_id_json", "{}")
+
+            try:
+                mapa_id_json = json.loads(mapa_id_str)
+            except Exception:
+                mapa_id_json = {}
+
+            categoria_selecionada = cliente_db.get("categoria_selecionada", "")
+
+            resultado = await processar_navegacao_cardapio(
                 estado_atual,
+                entrada_cliente,  # Aqui a entrada é a opção escolhida ("1" ou "2")
                 jid,
-                jid,
+                telefone_real,
                 primeiro_nome,
-                entrada_cliente,
-                cliente_db,
+                categoria_selecionada,
+                pagina_atual,
+                mapa_id_json,
             )
         elif estado_atual == "aguardando_escolha_item":
             resultado = processar_escolha_item(
@@ -497,6 +523,36 @@ async def _processar_maquina_estados(
 
         if asyncio.iscoroutine(resultado):
             resultado = await resultado
+
+        # ==============================================================
+        # 🔄 RASTREADOR VISUAL DA PRÓXIMA ROTA
+        # ==============================================================
+        import re
+
+        proxima_rota = estado_atual  # Mantém a mesma se o fluxo não a alterar
+
+        if isinstance(resultado, dict):
+            sql_cmds = (
+                resultado.get("sql_update")
+                or resultado.get("sql_updates")
+                or resultado.get("sql_reseta")
+            )
+            if sql_cmds:
+                lista_cmds = [sql_cmds] if isinstance(sql_cmds, str) else sql_cmds
+                for comando in lista_cmds:
+                    if comando and "estado_conversa" in comando.lower():
+                        # Extrai o novo estado de dentro do comando SQL
+                        match = re.search(
+                            r"estado_conversa\s*=\s*'([^']+)'", comando, re.IGNORECASE
+                        )
+                        if match:
+                            proxima_rota = match.group(1)
+                            break
+
+        print(
+            f"[PRÓXIMA ROTA] Cliente: {primeiro_nome} | Movido para: '{proxima_rota}'\n"
+        )
+        # ==============================================================
 
         if isinstance(resultado, dict):
             sql_cmds = (

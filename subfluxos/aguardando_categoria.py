@@ -1,10 +1,8 @@
 import json
 import asyncio
 
-# ==============================================================
-# IMPORTAÇÕES GLOBAIS (No topo para o Python nunca perder)
-# ==============================================================
-from subfluxos.navegacao_cardapio import processar_navegacao_cardapio
+# IMPORTAÇÃO CORRIGIDA: Agora chama a busca do cardápio para gerar o menu!
+from subfluxos.cardapio import processar_busca_cardapio
 from subfluxos.cliente_retorna_menu import processar_retorno_menu
 
 
@@ -13,14 +11,8 @@ async def processar_aguardando_categoria(
 ):
     entrada = str(entrada_cliente).strip().lower()
 
-    # ==============================================================
-    # OPÇÃO 3: VOLTAR AO MENU PRINCIPAL
-    # ==============================================================
     if entrada in ["3", "menu", "menu principal", "voltar", "início", "inicio"]:
-
-        # Chama a função que devolve o menu na tela (usando jid, jid para manter o padrão)
         resultado = processar_retorno_menu(jid, jid, cliente_db)
-
         if asyncio.iscoroutine(resultado):
             resultado = await resultado
 
@@ -34,19 +26,14 @@ async def processar_aguardando_categoria(
                     resultado["sql_update"] = [resultado["sql_update"], sql_update]
             else:
                 resultado["sql_update"] = sql_update
-
         return resultado
 
-    # ==============================================================
-    # IDENTIFICA A CATEGORIA (Individuais ou Combos)
-    # ==============================================================
     categoria = None
     if entrada in ["1", "individuais", "individual", "trufas", "trufa"]:
         categoria = "Individuais"
     elif entrada in ["2", "combos", "combo"]:
         categoria = "Combos"
 
-    # Se o cliente enviou algo inválido
     if not categoria:
         mensagem = (
             f"_*👸🏾 Kakaw - TheLordTrufas.*_\n\n"
@@ -80,31 +67,15 @@ async def processar_aguardando_categoria(
         }
         return {"payload": payload_erro}
 
-    # ==============================================================
-    # SE A CATEGORIA FOR VÁLIDA (Inicia a busca no Notion)
-    # ==============================================================
-    sql_transicao = f"UPDATE conversas_bot SET estado_conversa = 'visualizando_cardapio', categoria_selecionada = '{categoria}', pagina_atual = 1 WHERE jid = '{jid}';"
-
-    cliente_db_temp = cliente_db.copy() if cliente_db else {}
-    cliente_db_temp["categoria_selecionada"] = categoria
-    cliente_db_temp["pagina_atual"] = 1
-
-    resultado = processar_navegacao_cardapio(
-        "visualizando_cardapio", jid, telefone_real, primeiro_nome, "1", cliente_db_temp
+    # ROTA CORRETA: Chama o cardápio no Notion para exibir os produtos.
+    # O próprio processar_busca_cardapio já atualiza o estado para "visualizando_cardapio" no banco.
+    resultado = await processar_busca_cardapio(
+        user_id=jid,
+        telefone_real=telefone_real,
+        primeiro_nome=primeiro_nome,
+        tipo_selecionado=categoria,
+        pagina_atual=1,
+        mapa_id_json="{}",
     )
-
-    if asyncio.iscoroutine(resultado):
-        resultado = await resultado
-
-    comandos_sql = [sql_transicao]
-    sql_nav = resultado.get("sql_update")
-
-    if sql_nav:
-        if isinstance(sql_nav, list):
-            comandos_sql.extend(sql_nav)
-        else:
-            comandos_sql.append(sql_nav)
-
-    resultado["sql_update"] = comandos_sql
 
     return resultado
