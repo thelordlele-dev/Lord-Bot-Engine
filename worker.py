@@ -398,13 +398,27 @@ async def _processar_maquina_estados(
                 pagina_atual,
                 mapa_id_json,
             )
-        elif estado_atual == "aguardando_escolha_item":
+        elif estado_atual in [
+            "aguardando_escolha_item",
+            "aguardando_escolha_item_cupom",
+        ]:
+            mapa_id_json_str = cliente_db.get("mapa_id_json", "{}")
             resultado = processar_escolha_item(
-                jid, jid, primeiro_nome, entrada_cliente, cliente_db
+                jid,
+                telefone_real,
+                primeiro_nome,
+                entrada_cliente,
+                cliente_db,
+                mapa_id_json_str,
             )
-        elif estado_atual == "processando_lista_itens":
+
+        elif estado_atual in [
+            "processando_lista_itens",
+            "processando_lista_itens_cupom",
+        ]:
+            # A função quantidade tem apenas 5 argumentos (ela lê o mapa por dentro do cliente_db)
             resultado = processar_quantidade_item(
-                jid, jid, primeiro_nome, entrada_cliente, cliente_db
+                jid, telefone_real, primeiro_nome, entrada_cliente, cliente_db
             )
         elif estado_atual == "calcula_pedido":
             resultado = processar_calculo_pedido(jid, jid, primeiro_nome, cliente_db)

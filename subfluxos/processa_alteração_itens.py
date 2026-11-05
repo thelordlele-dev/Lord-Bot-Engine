@@ -1,5 +1,8 @@
 import json
+import httpx
+import os
 from subfluxos.calculo_pedido import processar_calculo_pedido
+from config.database import obter_conexao, liberar_conexao
 
 
 async def processando_alteracao_itens(
@@ -23,34 +26,78 @@ async def processando_alteracao_itens(
             },
         }
 
-    indice_atual = int(dados_estado.get("indice_item_atual", 0))
-
-    itens_raw = dados_estado.get("itens_a_processar", "")
-    if isinstance(itens_raw, str) and itens_raw.startswith("{"):
-        itens_a_processar = [i.strip() for i in itens_raw.strip("{}").split(",")]
-    else:
-        try:
-            itens_a_processar = (
-                json.loads(itens_raw) if isinstance(itens_raw, str) else itens_raw
-            )
-        except Exception:
-            itens_a_processar = []
-
-    mapa_raw = dados_estado.get("mapa_id_json", "{}")
+    # =========================================================================
+    # CORREÇÃO: Busca as listas sempre frescas diretamente no banco de dados.
+    # =========================================================================
+    conexao = await obter_conexao()
     try:
-        mapa_id = json.loads(mapa_raw) if isinstance(mapa_raw, str) else mapa_raw
-    except Exception:
+        row = await conexao.fetchrow(
+            "SELECT itens_a_processar, mapa_id_json, carrinho_json, indice_item_atual FROM conversas_bot WHERE jid = $1",
+            user_id,
+        )
+    finally:
+        await liberar_conexao(conexao)
+
+    if not row:
+        return {"sql_update": None}
+
+    indice_atual = int(row.get("indice_item_atual") or 0)
+    itens_raw = row.get("itens_a_processar")
+    mapa_raw = row.get("mapa_id_json")
+    carrinho_raw = row.get("carrinho_json")
+
+    # Tratamento da lista de Itens
+    if isinstance(itens_raw, str):
+        try:
+            itens_a_processar = json.loads(itens_raw)
+        except Exception:
+            if itens_raw.startswith("{"):
+                itens_a_processar = [
+                    i.strip() for i in itens_raw.strip("{}").split(",")
+                ]
+            else:
+                itens_a_processar = []
+    elif isinstance(itens_raw, list):
+        itens_a_processar = itens_raw
+    else:
+        itens_a_processar = []
+
+    # Tratamento do Mapa ID
+    if isinstance(mapa_raw, str):
+        try:
+            mapa_id = json.loads(mapa_raw)
+        except Exception:
+            mapa_id = {}
+    elif isinstance(mapa_raw, dict):
+        mapa_id = mapa_raw
+    else:
         mapa_id = {}
 
-    carrinho_raw = dados_estado.get("carrinho_json", "[]")
-    try:
-        carrinho = (
-            json.loads(carrinho_raw) if isinstance(carrinho_raw, str) else carrinho_raw
-        )
-    except Exception:
+    # Tratamento do Carrinho
+    if isinstance(carrinho_raw, str):
+        try:
+            carrinho = json.loads(carrinho_raw)
+        except Exception:
+            carrinho = []
+    elif isinstance(carrinho_raw, list):
+        carrinho = carrinho_raw
+    else:
         carrinho = []
-    if not isinstance(carrinho, list):
-        carrinho = []
+
+    # Proteção contra lista vazia
+    if not itens_a_processar:
+        return {
+            "sql_update": f"UPDATE conversas_bot SET estado_conversa = 'aguardando_categoria' WHERE jid = '{user_id}';",
+            "payload": {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": telefone_real,
+                "type": "text",
+                "text": {
+                    "body": f"_*👸🏾 Kakaw - TheLordTrufas.*_\n\nOcorreu um erro ao identificar a sua escolha. Por favor, reinicie a escolha da categoria."
+                },
+            },
+        }
 
     for item_num in itens_a_processar:
         if str(item_num) not in mapa_id:
@@ -69,30 +116,110 @@ async def processando_alteracao_itens(
                 },
             }
 
-    item_atual_numero = str(itens_a_processar[indice_atual])
-    item_atual_info = mapa_id.get(item_atual_numero)
+    if indice_atual >= len(itens_a_processar):
+        indice_atual = 0
 
-    if item_atual_info:
-        item_no_carrinho = next(
-            (
+    item_atual_numero = str(itens_a_processar[indice_atual])
+    item_atual_info = mapa_id.get(item_atual_numero, {})
+
+    id_real = item_atual_info.get("id")
+    page_id_notion = item_atual_info.get("page_id")
+    nome_item = item_atual_info.get("nome", "Item")
+    preco_unitario = float(item_atual_info.get("preco", 0))
+    estoque_disponivel = int(item_atual_info.get("estq", 0))
+
+    item_no_carrinho = next(
+        (
+            item
+            for item in carrinho
+            if str(item.get("Indice", item.get("indice"))) == item_atual_numero
+        ),
+        None,
+    )
+    qtd_anterior = int(item_no_carrinho.get("qtd", 0)) if item_no_carrinho else 0
+
+    if nova_quantidade > 0:
+        diferenca = nova_quantidade - qtd_anterior
+    else:
+        diferenca = -qtd_anterior
+
+    if diferenca > estoque_disponivel:
+        mensagem_estoque = (
+            f"Ops! 😟 O estoque é insuficiente para esta quantidade:\n\n"
+            f"*{item_atual_numero}.* {nome_item} - R$ {preco_unitario:.2f}:\n\n"
+            f"Temos apenas mais *{estoque_disponivel}* unidades em estoque além das que já pediu.\n\n"
+            "Por favor, envie a nova quantidade total desejada deste item.\n\n"
+            '_*(Digite "0" para remover o item)*_\n'
+        )
+        return {
+            "sql_update": None,
+            "payload": {
+                "messaging_product": "whatsapp",
+                "recipient_type": "individual",
+                "to": telefone_real,
+                "type": "text",
+                "text": {
+                    "body": f"_*👸🏾 Kakaw - TheLordTrufas.*_\n\n{mensagem_estoque}"
+                },
+            },
+        }
+
+    # ==============================================================
+    # ATUALIZAÇÃO IMEDIATA NO NOTION API (Abate/Devolve Estoque)
+    # ==============================================================
+    if diferenca != 0:
+        if not page_id_notion:
+            print(f"❌ Erro Notion: page_id não encontrado para o item {id_real}.")
+        else:
+            novo_estoque = estoque_disponivel - diferenca
+
+            NOTION_TOKEN = os.getenv("NOTION_API_KEY", "")
+            notion_headers = {
+                "Authorization": f"Bearer {NOTION_TOKEN}",
+                "Notion-Version": "2022-06-28",
+                "Content-Type": "application/json",
+            }
+            notion_payload = {"properties": {"Estoque": {"number": novo_estoque}}}
+
+            try:
+                async with httpx.AsyncClient() as client:
+                    res = await client.patch(
+                        f"https://api.notion.com/v1/pages/{page_id_notion}",
+                        json=notion_payload,
+                        headers=notion_headers,
+                    )
+                    if res.status_code == 200:
+                        mapa_id[item_atual_numero]["estq"] = novo_estoque
+                        print(
+                            f"✅ Estoque de '{nome_item}' atualizado no Notion para {novo_estoque}."
+                        )
+                    else:
+                        print(
+                            f"❌ Erro Notion Estoque HTTP {res.status_code}: {res.text}"
+                        )
+            except Exception as e:
+                print(f"❌ Exceção ao atualizar estoque no Notion: {e}")
+
+    # Atualiza o carrinho (MUDANÇA: a chave volta a ser "indice" minúsculo para padrão)
+    if item_no_carrinho:
+        if nova_quantidade > 0:
+            item_no_carrinho["qtd"] = nova_quantidade
+        else:
+            carrinho = [
                 item
                 for item in carrinho
-                if str(item.get("Indice", item.get("indice"))) == item_atual_numero
-            ),
-            None,
+                if str(item.get("Indice", item.get("indice"))) != item_atual_numero
+            ]
+    elif nova_quantidade > 0:
+        carrinho.append(
+            {
+                "indice": item_atual_numero,
+                "id": id_real,
+                "nome": nome_item,
+                "qtd": nova_quantidade,
+                "precoUnitario": preco_unitario,
+            }
         )
-        if item_no_carrinho:
-            item_no_carrinho["qtd"] = nova_quantidade
-        elif nova_quantidade > 0:
-            carrinho.append(
-                {
-                    "Indice": item_atual_numero,
-                    "id": item_atual_info.get("id"),
-                    "nome": item_atual_info.get("nome"),
-                    "qtd": nova_quantidade,
-                    "precoUnitario": item_atual_info.get("preco"),
-                }
-            )
 
     proximo_indice = indice_atual + 1
 
@@ -125,7 +252,10 @@ async def processando_alteracao_itens(
 
         mensagem_resposta += f'*Preço:* {preco_formatado}\n\n*Qtde. Atual:* {qtd_proximo}\n*Estoque:* {estoque_atual}\n\n----------------------------------------------------\n\nPara *REMOVER* o item\né só digitar *"0"*\n\nPara *MANTER* o item\né só digitar a mesma\n*QUANTIDADE ATUAL*\n'
 
-        sql_update = f"UPDATE conversas_bot SET carrinho_json = '{json.dumps(carrinho, ensure_ascii=False)}', indice_item_atual = {proximo_indice}, expirando = FALSE, ultima_interacao = NOW() WHERE jid = '{user_id}';"
+        mapa_id_json_str = json.dumps(mapa_id, ensure_ascii=False).replace("'", "''")
+        carrinho_json_str = json.dumps(carrinho, ensure_ascii=False).replace("'", "''")
+
+        sql_update = f"UPDATE conversas_bot SET carrinho_json = '{carrinho_json_str}', mapa_id_json = '{mapa_id_json_str}', indice_item_atual = {proximo_indice}, expirando = FALSE, ultima_interacao = NOW() WHERE jid = '{user_id}';"
 
         return {
             "sql_update": sql_update,
@@ -144,12 +274,13 @@ async def processando_alteracao_itens(
         carrinho_json_str = json.dumps(carrinho_final, ensure_ascii=False).replace(
             "'", "''"
         )
+        mapa_id_json_str = json.dumps(mapa_id, ensure_ascii=False).replace("'", "''")
 
-        sql_update = f"UPDATE conversas_bot SET estado_conversa = 'calcula_pedido', carrinho_json = '{carrinho_json_str}', itens_a_processar = NULL, expirando = FALSE, indice_item_atual = NULL, ultima_interacao = NOW() WHERE jid = '{user_id}';"
+        sql_update = f"UPDATE conversas_bot SET estado_conversa = 'calcula_pedido', carrinho_json = '{carrinho_json_str}', mapa_id_json = '{mapa_id_json_str}', itens_a_processar = NULL, expirando = FALSE, indice_item_atual = NULL, ultima_interacao = NOW() WHERE jid = '{user_id}';"
 
-        # Usar o subfluxo em vez de action invisível
         dados_atualizados = dados_estado.copy()
         dados_atualizados["carrinho_json"] = carrinho_json_str
+        dados_atualizados["mapa_id_json"] = mapa_id_json_str
 
         primeiro_nome = dados_estado.get("primeiro_nome", "Cliente")
         resultado_calculo = await processar_calculo_pedido(

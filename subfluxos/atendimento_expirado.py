@@ -16,7 +16,7 @@ TIMEOUT_HTTP = 15.0
 
 # Mesma regra de expiração usada no SELECT e no UPDATE (única fonte da verdade)
 _CONDICAO_EXPIRADA = """
-    (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM ultima_interacao)) > 300
+    (EXTRACT(EPOCH FROM NOW()) - EXTRACT(EPOCH FROM ultima_interacao)) > 900
     AND is_bot_paused = FALSE
     AND estado_conversa != 'pagamento_concluido'
     AND estado_conversa != 'cliente_existe'
